@@ -29,7 +29,7 @@ type Album struct {
 	ID   string `json:"id"`
 }
 
-type Image struct {
+type ImageStuct struct {
 	Name    string `json:"name"`
 	ID      string `json:"id"`
 	AlbumID string `json:"albumid"`
@@ -49,7 +49,7 @@ func startupServer() {
 	r.HandleFunc("/deleteAlbum", deleteAlbum).Methods("DELETE")
 	r.HandleFunc("/createImage", createImage).Methods("POST")
 	r.HandleFunc("/deleteImage", deleteimage).Methods("DELETE")
-
+	r.HandleFunc("/getImage", getImage).Methods("GET")
 	log.Fatal(http.ListenAndServe("localhost:8000", r))
 
 }
@@ -75,6 +75,67 @@ func helloServer(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func getImage(w http.ResponseWriter, r *http.Request) {
+
+	imageid, ok := r.URL.Query()["imageid"]
+	if !ok || len(imageid[0]) < 1 {
+		log.Println("imageid is missing")
+		return
+	}
+	albumid, ok := r.URL.Query()["albumid"]
+	if !ok || len(albumid[0]) < 1 {
+		log.Println("imageid is missing")
+		return
+	}
+
+	log.Println(imageid[0], albumid[0])
+	var getimage ImageStuct
+	getimage.ID = imageid[0]
+	getimage.AlbumID = albumid[0]
+	imagepath, err := gettingImage(getimage)
+	if err != nil {
+		w.WriteHeader(403)
+		WriteJSONResponse(w, 403, "Invalid image or albumid")
+		fmt.Println("Invalid image or albumid")
+		fmt.Println(err)
+		return
+	} else {
+		filebytes, err := ioutil.ReadFile(imagepath)
+		if err != nil {
+			log.Println("Error while reading the file")
+		}
+		_, err = w.Write(filebytes)
+		if err != nil {
+			log.Println("Error while writing the file")
+		}
+		w.WriteHeader(200)
+		return
+	}
+
+}
+
+func gettingImage(getimage ImageStuct) (string, error) {
+	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
+
+	db, err := sql.Open("postgres", conStr)
+	if err != nil {
+		//log.Println(err)
+		return "", err
+	} else {
+		log.Println("Database connected")
+	}
+	defer db.Close()
+
+	statement := `SELECT imagepath FROM public.image WHERE imageid = $1 AND albumid = $2`
+	imagepath := ""
+	err = db.QueryRow(statement, getimage.ID, getimage.AlbumID).Scan(&imagepath)
+	if err != nil {
+		return "", err
+	}
+
+	return imagepath, err
+}
+
 func createAlbum(w http.ResponseWriter, r *http.Request) {
 
 	var newAlbum Album
@@ -91,6 +152,7 @@ func createAlbum(w http.ResponseWriter, r *http.Request) {
 	check, err := creatingAlbum(newAlbum)
 	if check == false {
 		log.Println("Album creation failed")
+		log.Println(err)
 		WriteJSONResponse(w, 403, "Cannot have multiple albums with same ID")
 		return
 	} else {
@@ -126,7 +188,7 @@ func creatingAlbum(newAlbum Album) (bool, error) {
 	log.Println(newAlbum.ID, newAlbum.Name)
 	err = db.QueryRow(statement, newAlbum.ID, newAlbum.Name).Scan(&name)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		return false, err
 	}
 	log.Println("New record is : ", name)
@@ -169,7 +231,7 @@ func DeletingAlbum(DelAlbum Album) (bool, error) {
 
 	db, err := sql.Open("postgres", conStr)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		return false, err
 	} else {
 		log.Println("Database connected")
@@ -219,7 +281,8 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 		WriteJSONResponse(w, 401, http.StatusBadRequest)
 		return
 	}
-	var creatImage Image
+	//log.Println(filetype[0])
+	var creatImage ImageStuct
 
 	err = json.Unmarshal([]byte(r.FormValue("data")), &creatImage)
 	if err != nil {
@@ -299,7 +362,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func CheckAlbumID(creatImage Image) (bool, error) {
+func CheckAlbumID(creatImage ImageStuct) (bool, error) {
 	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
 
 	db, err := sql.Open("postgres", conStr)
@@ -351,7 +414,7 @@ func CreatingImage(pushImageDB PushImageDB) (bool, error) {
 
 func deleteimage(w http.ResponseWriter, r *http.Request) {
 
-	var DelImage Image
+	var DelImage ImageStuct
 	err := json.NewDecoder(r.Body).Decode(&DelImage)
 	if err != nil {
 		w.WriteHeader(http.StatusForbidden)
@@ -379,7 +442,7 @@ func deleteimage(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func DeletingImage(DelImage Image) (string, error) {
+func DeletingImage(DelImage ImageStuct) (string, error) {
 	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
 
 	db, err := sql.Open("postgres", conStr)
