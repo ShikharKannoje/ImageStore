@@ -44,12 +44,14 @@ type PushImageDB struct {
 
 func startupServer() {
 	r := mux.NewRouter()
+	r.PathPrefix("/images/").Handler(http.StripPrefix("/images/", http.FileServer(http.Dir(uploadPath))))
 	r.HandleFunc("/", helloServer)
 	r.HandleFunc("/createAlbum", createAlbum).Methods("POST")
 	r.HandleFunc("/deleteAlbum", deleteAlbum).Methods("DELETE")
 	r.HandleFunc("/createImage", createImage).Methods("POST")
 	r.HandleFunc("/deleteImage", deleteimage).Methods("DELETE")
 	r.HandleFunc("/getImage", getImage).Methods("GET")
+	r.HandleFunc("/getAlbumImage", getAlbumImage).Methods("GET")
 	log.Fatal(http.ListenAndServe("localhost:8000", r))
 
 }
@@ -71,7 +73,7 @@ func helloServer(w http.ResponseWriter, r *http.Request) {
 
 	//w.WriteHeader(http.StatusInternalServerError)
 	log.Println("Server said Hello")
-	//fmt.Fprintf(w, "Hello")
+	fmt.Fprintf(w, "Hello")
 	return
 }
 
@@ -134,6 +136,21 @@ func gettingImage(getimage ImageStuct) (string, error) {
 	}
 
 	return imagepath, err
+}
+
+func getAlbumImage(w http.ResponseWriter, r *http.Request) {
+
+	albumid, ok := r.URL.Query()["albumid"]
+	if !ok || len(albumid[0]) < 1 {
+		log.Println("imageid is missing")
+		return
+	}
+
+	url := "/images/" + albumid[0] + "/"
+	log.Println(url)
+	http.Redirect(w, r, url, http.StatusSeeOther)
+
+	return
 }
 
 func createAlbum(w http.ResponseWriter, r *http.Request) {
