@@ -48,3 +48,7 @@ These are the environement variables, kindly set the environment variable first 
 
 Run `go get` command to download all dependencies.
 Run `go build` to create the binary.
+
+To run swagger, fire the below command
+
+swagger serve -F=swagger swagger.json
