@@ -243,6 +243,7 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println("Error while writing the file")
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
 		return
 	}
@@ -333,7 +334,7 @@ func createAlbum(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println(err)
 		}
-
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 200, "Successfully Album Created")
 		//fmt.Fprintf(w, "Successfully Album Created\n")
 		return
@@ -395,6 +396,7 @@ func deleteAlbum(w http.ResponseWriter, r *http.Request) {
 	check, err := deletingAlbum(DelAlbum)
 	if check == false {
 		log.Println(err)
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 403, "No Album Found")
 		return
 	} else {
@@ -403,6 +405,7 @@ func deleteAlbum(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 		log.Printf("Album %s Deleted", DelAlbum.Name)
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 200, "Album deletion Successfull")
 		return
 	}
@@ -464,6 +467,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("Error Retrieving the File")
 		fmt.Println(err)
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 403, "Error Retrieving the File")
 		return
 	}
@@ -472,6 +476,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 	filetype := http.DetectContentType(fileBytes)
 	if filetype != "image/jpeg" && filetype != "image/jpg" &&
 		filetype != "image/gif" && filetype != "image/png" {
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 401, http.StatusBadRequest)
 		return
 	}
@@ -495,6 +500,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println(err)
 		}
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 403, "Album does not exist")
 		return
 	} else {
@@ -548,6 +554,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 		tempFile.Write(fileBytes)
 		// return that we have successfully uploaded our file!
 		//fmt.Fprintf(w, "Successfully Uploaded File\n")
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 200, "Successfully Uploaded File")
 	}
 
@@ -635,6 +642,7 @@ func deleteimage(w http.ResponseWriter, r *http.Request) {
 	imageName, err := deletingImage(DelImage)
 	if err != nil {
 		log.Println(err)
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 403, "No image found with the given imageID")
 		return
 	} else {
@@ -643,6 +651,7 @@ func deleteimage(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 		log.Printf("Image %s Deleted", imageName)
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 200, "Successfully deleted the image")
 		return
 	}
