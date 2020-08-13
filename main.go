@@ -1,3 +1,19 @@
+// ImageStore Service API
+//
+// .
+//
+//     Schemes: http, https
+//     Host: localhost:8000
+//     Version: 0.1.0
+//     basePath: /
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+// swagger:meta
 package main
 
 import (
@@ -35,18 +51,76 @@ func startupServer() {
 	log.Println(staticpath)
 	r.PathPrefix(staticpath).Handler(http.StripPrefix(staticpath, http.FileServer(http.Dir(uploadPath))))
 	//hello server
+	// swagger:operation Get / helloServer
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/", helloServer)
 	//CreateAlbum
+	// swagger:operation POST /createAlbum createAlbum
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/createAlbum", createAlbum).Methods("POST")
 	//DeleteAlbum
+	// swagger:operation DELETE /deleteAlbum DeleteAlbum
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/deleteAlbum", deleteAlbum).Methods("DELETE")
 	//CreateImage
+	// swagger:operation POST /createImage createImage
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/createImage", createImage).Methods("POST")
 	//DeleteImage
+	// swagger:operation DELETE /deleteImage deleteImage
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/deleteImage", deleteimage).Methods("DELETE")
+
 	//GetImage
+	// swagger:operation GET /getImage getImage
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/getImage", getImage).Methods("GET")
 	//GetAlbumImages
+
+	// swagger:operation GET /getAlbumImage AlbumImage
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/getAlbumImage", getAlbumImage).Methods("GET")
 
 	log.Fatal(http.ListenAndServe("localhost:8000", r))
