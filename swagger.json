@@ -26,13 +26,34 @@
         "operationId": "helloServer",
         "responses": {
           "200": {
-            "description": "successful operation"
+            "description": "Successfull"
           }
         }
       }
     },
     "/createAlbum": {
       "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "album",
+            "description": "Album Name to create.",
+            "schema": {
+              "type": "object",
+              "required": [
+                "albumname"
+              ],
+              "properties": {
+                "albumname": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
         "produces": [
           "application/json"
         ],
@@ -46,6 +67,28 @@
     },
     "/createImage": {
       "post": {
+        "consumes": [
+          "application/json",
+          "multipart/form-data"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "image",
+            "description": "The image to create.",
+            "schema": {
+              "type": "object",
+              "required": [
+                "albumid"
+              ],
+              "properties": {
+                "albumid": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
         "produces": [
           "application/json"
         ],
@@ -59,6 +102,27 @@
     },
     "/deleteAlbum": {
       "delete": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "Album",
+            "description": "The Album to delete.",
+            "schema": {
+              "type": "object",
+              "required": [
+                "albumid"
+              ],
+              "properties": {
+                "albumid": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
         "produces": [
           "application/json"
         ],
@@ -72,6 +136,31 @@
     },
     "/deleteImage": {
       "delete": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "Image",
+            "description": "The Image to delete.",
+            "schema": {
+              "type": "object",
+              "required": [
+                "imageid",
+                "albumid"
+              ],
+              "properties": {
+                "imageid": {
+                  "type": "string"
+                },
+                "albumid": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
         "produces": [
           "application/json"
         ],
@@ -85,6 +174,14 @@
     },
     "/getAlbumImage": {
       "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "Album",
+            "type": "string",
+            "description": "To get all the images of the album"
+          }
+        ],
         "produces": [
           "application/json"
         ],
@@ -98,8 +195,22 @@
     },
     "/getImage": {
       "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "imageid",
+            "type": "string",
+            "description": "The image Id"
+          },
+          {
+            "in": "query",
+            "name": "albumid",
+            "type": "string",
+            "description": "The album ID"
+          }
+        ],
         "produces": [
-          "application/json"
+          "image/jpeg"
         ],
         "operationId": "getImage",
         "responses": {
