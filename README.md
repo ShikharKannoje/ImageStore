@@ -43,6 +43,7 @@ These are the environement variables, kindly set the environment variable first 
 	uploadPath   = "./images"
 
 
+
 ### Steps to Build the project
 
 Run `go get` command to download all dependencies.

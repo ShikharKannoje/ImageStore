@@ -1,0 +1,113 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http",
+    "https"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "description": ".",
+    "title": "ImageStore Service API",
+    "version": "0.1.0"
+  },
+  "host": "localhost:8000",
+  "basePath": "/",
+  "paths": {
+    "/": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "helloServer",
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      }
+    },
+    "/createAlbum": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "createAlbum",
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      }
+    },
+    "/createImage": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "createImage",
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      }
+    },
+    "/deleteAlbum": {
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "DeleteAlbum",
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      }
+    },
+    "/deleteImage": {
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "deleteImage",
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      }
+    },
+    "/getAlbumImage": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "AlbumImage",
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      }
+    },
+    "/getImage": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "getImage",
+        "responses": {
+          "200": {
+            "description": "successful operation"
+          }
+        }
+      }
+    }
+  }
+}

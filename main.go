@@ -1,3 +1,19 @@
+// ImageStore Service API
+//
+// .
+//
+//     Schemes: http, https
+//     Host: localhost:8000
+//     Version: 0.1.0
+//     basePath: /
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+// swagger:meta
 package main
 
 import (
@@ -9,6 +25,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -35,18 +52,76 @@ func startupServer() {
 	log.Println(staticpath)
 	r.PathPrefix(staticpath).Handler(http.StripPrefix(staticpath, http.FileServer(http.Dir(uploadPath))))
 	//hello server
+	// swagger:operation Get / helloServer
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/", helloServer)
 	//CreateAlbum
+	// swagger:operation POST /createAlbum createAlbum
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/createAlbum", createAlbum).Methods("POST")
 	//DeleteAlbum
+	// swagger:operation DELETE /deleteAlbum DeleteAlbum
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/deleteAlbum", deleteAlbum).Methods("DELETE")
 	//CreateImage
+	// swagger:operation POST /createImage createImage
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/createImage", createImage).Methods("POST")
 	//DeleteImage
+	// swagger:operation DELETE /deleteImage deleteImage
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/deleteImage", deleteimage).Methods("DELETE")
+
 	//GetImage
+	// swagger:operation GET /getImage getImage
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/getImage", getImage).Methods("GET")
 	//GetAlbumImages
+
+	// swagger:operation GET /getAlbumImage AlbumImage
+	//
+	// ---
+	// produces:
+	// - application/json
+	// responses:
+	//   '200':
+	//     description: successful operation
 	r.HandleFunc("/getAlbumImage", getAlbumImage).Methods("GET")
 
 	log.Fatal(http.ListenAndServe("localhost:8000", r))
@@ -64,6 +139,11 @@ type Album struct {
 	ID   string `json:"id"`
 }
 
+//CreateAlbum for creation of album
+type CreateAlbum struct {
+	Name string `json:"name"`
+}
+
 //ImageStruct represents the structure of Image
 //ImageStruct Json request payload is as follows,
 //{
@@ -72,8 +152,6 @@ type Album struct {
 //	"AlbumID": "123"
 //}
 type ImageStruct struct {
-	Name    string `json:"name"`
-	ID      string `json:"id"`
 	AlbumID string `json:"albumid"`
 }
 
@@ -87,7 +165,6 @@ type ImageStruct struct {
 //}
 type PushImageDB struct {
 	Name      string `json:"name"`
-	ID        string `json:"id"`
 	AlbumID   string `json:"albumid"`
 	Imagepath string `json:"imagepath"`
 }
@@ -135,6 +212,12 @@ func helloServer(w http.ResponseWriter, r *http.Request) {
 // @Success 200 image
 // @Router /getImage [get]
 
+//GetImageStruct used for getting an image
+type GetImageStruct struct {
+	ImageID string `json:"imageid"`
+	AlbumID string `json:"albumid"`
+}
+
 //getImage method is called to get an individual image using image ID
 func getImage(w http.ResponseWriter, r *http.Request) {
 
@@ -150,8 +233,8 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println(imageid[0], albumid[0])
-	var getimage ImageStruct
-	getimage.ID = imageid[0]
+	var getimage GetImageStruct
+	getimage.ImageID = imageid[0]
 	getimage.AlbumID = albumid[0]
 	imagepath, err := gettingImage(getimage)
 	if err != nil {
@@ -169,6 +252,7 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println("Error while writing the file")
 		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
 		return
 	}
@@ -176,7 +260,7 @@ func getImage(w http.ResponseWriter, r *http.Request) {
 }
 
 //getImage is calling this gettingImage internally to handle DB operations
-func gettingImage(getimage ImageStruct) (string, error) {
+func gettingImage(getimage GetImageStruct) (string, error) {
 	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
 
 	db, err := sql.Open("postgres", conStr)
@@ -190,7 +274,9 @@ func gettingImage(getimage ImageStruct) (string, error) {
 
 	statement := `SELECT imagepath FROM public.image WHERE imageid = $1 AND albumid = $2`
 	imagepath := ""
-	err = db.QueryRow(statement, getimage.ID, getimage.AlbumID).Scan(&imagepath)
+	imageintID, err := strconv.Atoi(getimage.ImageID)
+	albumintID, err := strconv.Atoi(getimage.AlbumID)
+	err = db.QueryRow(statement, imageintID, albumintID).Scan(&imagepath)
 	if err != nil {
 		return "", err
 	}
@@ -214,14 +300,33 @@ func getAlbumImage(w http.ResponseWriter, r *http.Request) {
 
 	albumid, ok := r.URL.Query()["albumid"]
 	if !ok || len(albumid[0]) < 1 {
-		log.Println("imageid is missing")
+		log.Println("Album is missing")
 		return
 	}
+	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
 
-	url := uploadPath + "/" + albumid[0] + "/"
-	log.Println(url)
-	http.Redirect(w, r, url, http.StatusSeeOther)
+	db, err := sql.Open("postgres", conStr)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println("Database connected")
+	}
+	defer db.Close()
 
+	albumidInt, err := strconv.Atoi(albumid[0])
+	statement := `SELECT albumid FROM public.album WHERE albumid = $1`
+	var id int
+	err = db.QueryRow(statement, albumidInt).Scan(&id)
+	if err != nil {
+		log.Println(err)
+		w.Write([]byte("Album does not exist"))
+		WriteJSONResponse(w, 403, http.StatusForbidden)
+		return
+	} else {
+		url := uploadPath + "/" + albumid[0] + "/"
+		log.Println(url)
+		http.Redirect(w, r, url, http.StatusSeeOther)
+	}
 	return
 }
 
@@ -236,7 +341,7 @@ func getAlbumImage(w http.ResponseWriter, r *http.Request) {
 //createAlbum is called when album creation request is made.
 func createAlbum(w http.ResponseWriter, r *http.Request) {
 
-	var newAlbum Album
+	var newAlbum CreateAlbum
 
 	err := json.NewDecoder(r.Body).Decode(&newAlbum)
 	if err != nil {
@@ -244,23 +349,24 @@ func createAlbum(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
-	log.Println("Album ID is : ", newAlbum.ID)
+	//log.Println("Album ID is : ", newAlbum.ID)
 	log.Println("Album Name is : ", newAlbum.Name)
 
-	check, err := creatingAlbum(newAlbum)
-	if check == false {
+	album, err := creatingAlbum(newAlbum)
+	if err != nil {
 		log.Println("Album creation failed")
 		log.Println(err)
 		WriteJSONResponse(w, 403, "Cannot have multiple albums with same ID")
 		return
 	} else {
-		log.Printf("Album %s created", newAlbum.Name)
-		err = os.Mkdir(uploadPath+"/"+newAlbum.ID, 755)
+		log.Printf("Album %s created", album.Name)
+		err = os.Mkdir(uploadPath+"/"+string(album.ID), 755)
 		if err != nil {
 			log.Println(err)
 		}
-
-		WriteJSONResponse(w, 200, "Successfully Album Created")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("AlbumID " + string(album.ID) + " created"))
+		WriteJSONResponse(w, 200, "Successfull")
 		//fmt.Fprintf(w, "Successfully Album Created\n")
 		return
 	}
@@ -268,31 +374,34 @@ func createAlbum(w http.ResponseWriter, r *http.Request) {
 }
 
 //creatingAlbum is being called from createAlbum to handle the DB operation
-func creatingAlbum(newAlbum Album) (bool, error) {
+func creatingAlbum(newAlbum CreateAlbum) (Album, error) {
 
 	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
-
+	var album Album
 	db, err := sql.Open("postgres", conStr)
 	if err != nil {
 		log.Println(err)
-		return false, err
+		return album, err
 	} else {
 		log.Println("Database connected")
 	}
 
 	defer db.Close()
 
-	statement := `INSERT into public.album(albumid, albumname) VALUES($1, $2) RETURNING albumname`
+	statement := `INSERT into public.album(albumname) VALUES($1) RETURNING albumname, albumid`
 	name := ""
-	log.Println(newAlbum.ID, newAlbum.Name)
-	err = db.QueryRow(statement, newAlbum.ID, newAlbum.Name).Scan(&name)
+	var id int
+	log.Println(newAlbum.Name)
+	err = db.QueryRow(statement, newAlbum.Name).Scan(&name, &id)
 	if err != nil {
 		//log.Println(err)
-		return false, err
+		return album, err
 	}
-	log.Println("New record is : ", name)
+	log.Println("New Album is : ", name)
 
-	return true, nil
+	album.ID = strconv.Itoa(id)
+	album.Name = name
+	return album, nil
 }
 
 // DeleteAlbum godoc
@@ -305,30 +414,36 @@ func creatingAlbum(newAlbum Album) (bool, error) {
 // @Success 200 {object} Order
 // @Router /deleteAlbum [post]
 
+type deleteAlbumStruct struct {
+	AlbumID string `json:"albumid"`
+}
+
 //deleteAlbum is called to delete an album by providing the albumid.
 func deleteAlbum(w http.ResponseWriter, r *http.Request) {
 
-	var DelAlbum Album
+	var DelAlbum deleteAlbumStruct
 	err := json.NewDecoder(r.Body).Decode(&DelAlbum)
 	if err != nil {
 		w.WriteHeader(http.StatusForbidden)
 		log.Println(err)
 	}
 
-	log.Println("Album ID needs to be deleted : ", DelAlbum.ID)
-	log.Println("Album Name needs to be deleted : ", DelAlbum.Name)
+	log.Println("Album ID needs to be deleted : ", DelAlbum)
 
-	check, err := deletingAlbum(DelAlbum)
-	if check == false {
+	delalbum, err := deletingAlbum(DelAlbum)
+	if err != nil {
 		log.Println(err)
-		WriteJSONResponse(w, 403, "No Album Found")
+		w.Header().Set("Content-Type", "application/json")
+		WriteJSONResponse(w, 403, "No Album Found with the given id")
 		return
 	} else {
-		err = os.RemoveAll(uploadPath + "/" + DelAlbum.ID)
+		err = os.RemoveAll(uploadPath + "/" + delalbum.ID)
 		if err != nil {
 			log.Println(err)
 		}
-		log.Printf("Album %s Deleted", DelAlbum.Name)
+		log.Printf("Album %s Deleted", delalbum.Name)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("Album " + delalbum.Name + " is deleted"))
 		WriteJSONResponse(w, 200, "Album deletion Successfull")
 		return
 	}
@@ -336,30 +451,33 @@ func deleteAlbum(w http.ResponseWriter, r *http.Request) {
 }
 
 //deletingAlbum is being called from deleteAlbum to handle DB operation
-func deletingAlbum(DelAlbum Album) (bool, error) {
+func deletingAlbum(DelAlbum deleteAlbumStruct) (Album, error) {
 
 	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
-
+	var delalbum Album
 	db, err := sql.Open("postgres", conStr)
 	if err != nil {
 		//log.Println(err)
-		return false, err
+		return delalbum, err
 	} else {
 		log.Println("Database connected")
 	}
 
 	defer db.Close()
 
-	statement := `Delete FROM public.album WHERE albumid = $1 RETURNING albumname`
+	statement := `Delete FROM public.album WHERE albumid = $1 RETURNING albumname, albumid`
 	name := ""
-	log.Println(DelAlbum.ID, DelAlbum.Name)
-	err = db.QueryRow(statement, DelAlbum.ID).Scan(&name)
+	var id int
+	albumIDInt, err := strconv.Atoi(DelAlbum.AlbumID)
+	err = db.QueryRow(statement, albumIDInt).Scan(&name, &id)
 	if err != nil {
 		log.Println(err)
-		return false, err
+		return delalbum, err
 	}
 	log.Println("Deleted Album is : ", name)
-	return true, nil
+	delalbum.ID = strconv.Itoa(id)
+	delalbum.Name = name
+	return delalbum, nil
 
 }
 
@@ -390,6 +508,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("Error Retrieving the File")
 		fmt.Println(err)
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 403, "Error Retrieving the File")
 		return
 	}
@@ -398,6 +517,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 	filetype := http.DetectContentType(fileBytes)
 	if filetype != "image/jpeg" && filetype != "image/jpg" &&
 		filetype != "image/gif" && filetype != "image/png" {
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 401, http.StatusBadRequest)
 		return
 	}
@@ -421,6 +541,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println(err)
 		}
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 403, "Album does not exist")
 		return
 	} else {
@@ -437,25 +558,25 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 
 		}
 		tempFile, err := ioutil.TempFile(uploadPath+"/"+creatImage.AlbumID, "upload-*."+ext)
-
+		log.Println("Name of tempfile", tempFile.Name())
 		if err != nil {
 			fmt.Println(err)
 		}
 		defer tempFile.Close()
 		filestat, err := os.Stat(tempFile.Name())
-		creatImage.Name = filestat.Name()
+		log.Println("Name of filestat", filestat.Name())
+
 		// read all of the contents of our uploaded file into a
 		// byte array
 		var pushImageDB PushImageDB
 
-		pushImageDB.Name = creatImage.Name
-		pushImageDB.ID = creatImage.ID
+		pushImageDB.Name = filestat.Name()
 		pushImageDB.AlbumID = creatImage.AlbumID
-		pushImageDB.Imagepath = uploadPath + "/" + creatImage.AlbumID + "/" + creatImage.Name
+		pushImageDB.Imagepath = uploadPath + "/" + creatImage.AlbumID + "/" + filestat.Name()
 
 		fmt.Println(pushImageDB.Imagepath)
-		check, err := creatingImage(pushImageDB)
-		if check == false {
+		imageidreturn, err := creatingImage(pushImageDB)
+		if err != nil {
 			fmt.Println("Error while saving in db")
 			WriteJSONResponse(w, 403, "Cannot have multiple images with same ID")
 			tempFile.Close()
@@ -465,15 +586,18 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		log.Println("Image ID is : ", creatImage.ID)
-		log.Println("Image Name is : ", creatImage.Name)
-		log.Println("Image AlbumID is : ", creatImage.AlbumID)
+		// log.Println("Image ID is : ", creatImage.ID)
+		// log.Println("Image Name is : ", creatImage.Name)
+		// log.Println("Image AlbumID is : ", creatImage.AlbumID)
 
 		log.Printf("Image %s saved in db", pushImageDB.Name)
+		log.Printf("ImageID %s", imageidreturn)
 		// write this byte array to our file
 		tempFile.Write(fileBytes)
 		// return that we have successfully uploaded our file!
 		//fmt.Fprintf(w, "Successfully Uploaded File\n")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("ImageID " + imageidreturn + "uploaded"))
 		WriteJSONResponse(w, 200, "Successfully Uploaded File")
 	}
 
@@ -495,8 +619,9 @@ func checkAlbumIDMeth(creatImage ImageStruct) (bool, error) {
 	}
 
 	statement1 := `SELECT albumid FROM public.album where albumid = $1`
-	id := ""
-	err = db.QueryRow(statement1, creatImage.AlbumID).Scan(&id)
+	var id int
+	albumidint, err := strconv.Atoi(creatImage.AlbumID)
+	err = db.QueryRow(statement1, albumidint).Scan(&id)
 	if err != nil {
 		log.Println(err)
 		log.Println("AlbumID does not exist")
@@ -506,31 +631,31 @@ func checkAlbumIDMeth(creatImage ImageStruct) (bool, error) {
 }
 
 //creatingImage is called to handle the DB operation of image creation
-func creatingImage(pushImageDB PushImageDB) (bool, error) {
+func creatingImage(pushImageDB PushImageDB) (string, error) {
 
 	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
 
 	db, err := sql.Open("postgres", conStr)
 	if err != nil {
 		log.Println(err)
-		return false, err
+		return "", err
 	} else {
 		log.Println("Database connected")
 	}
 
 	defer db.Close()
-
-	statement := `INSERT into public.image(imageid, imagename, albumid, imagepath) VALUES($1, $2, $3, $4) RETURNING imageid`
-	id := ""
-	log.Println(pushImageDB.ID, pushImageDB.Name, pushImageDB.AlbumID, pushImageDB.Imagepath)
-	err = db.QueryRow(statement, pushImageDB.ID, pushImageDB.Name, pushImageDB.AlbumID, pushImageDB.Imagepath).Scan(&id)
+	albumidInt, err := strconv.Atoi(pushImageDB.AlbumID)
+	statement := `INSERT into public.image(imagename, albumid, imagepath) VALUES($1, $2, $3) RETURNING imageid`
+	var id int
+	log.Println(albumidInt, pushImageDB.Imagepath)
+	err = db.QueryRow(statement, pushImageDB.Name, albumidInt, pushImageDB.Imagepath).Scan(&id)
 	if err != nil {
 		log.Println(err)
-		return false, err
+		return "", err
 	}
-
+	rid := strconv.Itoa(id)
 	log.Println("New image saved: ")
-	return true, nil
+	return rid, nil
 
 }
 
@@ -544,23 +669,28 @@ func creatingImage(pushImageDB PushImageDB) (bool, error) {
 // @Success 200
 // @Router /deleteImage [post]
 
+type DelImageStruct struct {
+	ImageID string `json:"imageid"`
+	AlbumID string `json:"albumid"`
+}
+
 //deleteimage is called to delete a specific image, by given imageid
 func deleteimage(w http.ResponseWriter, r *http.Request) {
 
-	var DelImage ImageStruct
+	var DelImage DelImageStruct
 	err := json.NewDecoder(r.Body).Decode(&DelImage)
 	if err != nil {
 		w.WriteHeader(http.StatusForbidden)
 		log.Println(err)
 	}
 
-	log.Println("Image ID needs to be deleted : ", DelImage.ID)
-	log.Println("Image Name needs to be deleted : ", DelImage.Name)
+	log.Println("Image ID needs to be deleted : ", DelImage.ImageID)
 	log.Println("Image needs to be delted from Album ", DelImage.AlbumID)
 
 	imageName, err := deletingImage(DelImage)
 	if err != nil {
 		log.Println(err)
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 403, "No image found with the given imageID")
 		return
 	} else {
@@ -569,6 +699,7 @@ func deleteimage(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 		log.Printf("Image %s Deleted", imageName)
+		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 200, "Successfully deleted the image")
 		return
 	}
@@ -576,7 +707,7 @@ func deleteimage(w http.ResponseWriter, r *http.Request) {
 }
 
 //deletingImage is called to handle the DB operation
-func deletingImage(DelImage ImageStruct) (string, error) {
+func deletingImage(DelImage DelImageStruct) (string, error) {
 	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
 
 	db, err := sql.Open("postgres", conStr)
@@ -589,10 +720,12 @@ func deletingImage(DelImage ImageStruct) (string, error) {
 
 	defer db.Close()
 
-	statement := `Delete FROM public.image WHERE imageid = $1 RETURNING imagename`
+	statement := `Delete FROM public.image WHERE imageid = $1 AND albumid = $2 RETURNING imagename`
 	name := ""
-	log.Println(DelImage.ID, DelImage.Name)
-	err = db.QueryRow(statement, DelImage.ID).Scan(&name)
+	imageidInt, err := strconv.Atoi(DelImage.ImageID)
+	albumidInt, err := strconv.Atoi(DelImage.AlbumID)
+	log.Println(DelImage.ImageID, DelImage.AlbumID)
+	err = db.QueryRow(statement, imageidInt, albumidInt).Scan(&name)
 	if err != nil {
 		log.Println(err)
 		return "Query Failed", err
