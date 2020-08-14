@@ -49,6 +49,24 @@ These are the environement variables, kindly set the environment variable first 
 Run `go get` command to download all dependencies.
 Run `go build` to create the binary.
 
-To run swagger, fire the below command
 
-swagger serve -F=swagger swagger.json
+#### kafka commands 
+RUN Kafka server
+	.\bin\windows\kafka-server-start.bat .\config\server.properties
+1.  List Topics: 
+		kafka-topics.bat --list --zookeeper localhost:2181 
+2.	Describe Topic: 
+		kafka-topics.bat --describe --zookeeper localhost:2181 --topic [Topic Name]
+3.  Read messages from the beginning
+        Before version < 2.0: 
+			kafka-console-consumer.bat --zookeeper localhost:2181 --topic [Topic Name] --from-beginning
+        After version > 2.0:
+			kafka-console-consumer.bat --bootstrap-server localhost:9092 --topic [Topic Name] --from-beginning
+4.	Delete Topic: 
+			kafka-run-class.bat kafka.admin.TopicCommand --delete --topic [topic_to_delete] --zookeeper localhost:2181
+5.	Create New topic:
+			kafka-topics.bat --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic test
+6.	Create start a producer:
+			kafka-console-producer.bat --broker-list localhost:9092 --topic test
+7.	Start the consumer:
+			kafka-console-consumer.bat --bootstrap-server localhost:9092 --topic test

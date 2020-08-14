@@ -28,13 +28,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Shopify/sarama"
 	"github.com/gorilla/mux"
-
 	_ "github.com/lib/pq"
 )
 
 //constants can be set as env variables as well. I am hardcoding it for now
-
+const (
+	kafkaConn = "localhost:9092"
+	topic     = "testing"
+)
 const (
 	hostname     = "localhost"
 	hostport     = 5432
@@ -44,99 +47,10 @@ const (
 	uploadPath   = "./images"
 )
 
-//startupServer will start the server with all the routes
-func startupServer() {
-	r := mux.NewRouter()
-	staticpath := strings.TrimPrefix(uploadPath, ".")
-	staticpath = staticpath + "/"
-	log.Println(staticpath)
-	r.PathPrefix(staticpath).Handler(http.StripPrefix(staticpath, http.FileServer(http.Dir(uploadPath))))
-	//hello server
-	// swagger:operation Get / helloServer
-	//
-	// ---
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//     description: successful operation
-	r.HandleFunc("/", helloServer)
-	//CreateAlbum
-	// swagger:operation POST /createAlbum createAlbum
-	//
-	// ---
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//     description: successful operation
-	r.HandleFunc("/createAlbum", createAlbum).Methods("POST")
-	//DeleteAlbum
-	// swagger:operation DELETE /deleteAlbum DeleteAlbum
-	//
-	// ---
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//     description: successful operation
-	r.HandleFunc("/deleteAlbum", deleteAlbum).Methods("DELETE")
-	//CreateImage
-	// swagger:operation POST /createImage createImage
-	//
-	// ---
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//     description: successful operation
-	r.HandleFunc("/createImage", createImage).Methods("POST")
-	//DeleteImage
-	// swagger:operation DELETE /deleteImage deleteImage
-	//
-	// ---
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//     description: successful operation
-	r.HandleFunc("/deleteImage", deleteimage).Methods("DELETE")
-
-	//GetImage
-	// swagger:operation GET /getImage getImage
-	//
-	// ---
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//     description: successful operation
-	r.HandleFunc("/getImage", getImage).Methods("GET")
-	//GetAlbumImages
-
-	// swagger:operation GET /getAlbumImage AlbumImage
-	//
-	// ---
-	// produces:
-	// - application/json
-	// responses:
-	//   '200':
-	//     description: successful operation
-	r.HandleFunc("/getAlbumImage", getAlbumImage).Methods("GET")
-
-	log.Fatal(http.ListenAndServe("localhost:8000", r))
-
-}
-
-//Album represents the structure of album
-//Album Json request payload is as follows,
-//{
-//  "Name": "image1"
-//  "ID": "1",
-//}
-type Album struct {
-	Name string `json:"name"`
-	ID   string `json:"id"`
+//GetImageStruct used for getting an image
+type GetImageStruct struct {
+	ImageID string `json:"imageid"`
+	AlbumID string `json:"albumid"`
 }
 
 //CreateAlbum for creation of album
@@ -144,45 +58,105 @@ type CreateAlbum struct {
 	Name string `json:"name"`
 }
 
-//ImageStruct represents the structure of Image
-//ImageStruct Json request payload is as follows,
-//{
-//  "Name": "image1"
-//  "ID": "1",
-//	"AlbumID": "123"
-//}
-type ImageStruct struct {
+type deleteAlbumStruct struct {
 	AlbumID string `json:"albumid"`
 }
 
-//PushImageDB represents the structure of image while pushing it into database
-//PushImageDB will have values similar to as follows,
-//{
-//  "Name": "image1"
-//  "ID": "1",
-//	"AlbumID": "123"
-//	"Imagepath":"./images/123/{filename}"
-//}
 type PushImageDB struct {
 	Name      string `json:"name"`
 	AlbumID   string `json:"albumid"`
 	Imagepath string `json:"imagepath"`
 }
 
-// @title ImageStore service api
-// @version 1.0
-// @description This api is written to create/delete images and albums.
-// @termsOfService http://swagger.io/terms/
-// @contact.name Shikhar Kannoje
-// @contact.email shikharkannoje@gmail.com
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-// @host localhost:8000
-// @BasePath /
+type ImageStruct struct {
+	AlbumID string `json:"albumid"`
+}
+
+type Album struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+// DeleteImage godoc
+
+type DelImageStruct struct {
+	ImageID string `json:"imageid"`
+	AlbumID string `json:"albumid"`
+}
+
+func createKafkaProducer(notification string) {
+	// create producer
+	producer, err := initProducer()
+	if err != nil {
+		fmt.Println("Error producer: ", err.Error())
+		os.Exit(1)
+	}
+	publish(notification, producer)
+
+}
+
+func initProducer() (sarama.SyncProducer, error) {
+	// setup sarama log to stdout
+	//	sarama.Logger = log.New(os.Stdout, "", log.Ltime)
+	//verbose debugging (comment this line to disabled verbose sarama logging)
+	sarama.Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+
+	// producer config
+	config := sarama.NewConfig()
+	config.Producer.Retry.Max = 5
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	config.Producer.Return.Successes = true
+
+	// sync producer
+	prd, err := sarama.NewSyncProducer([]string{kafkaConn}, config)
+
+	return prd, err
+}
+
+func publish(message string, producer sarama.SyncProducer) {
+	// publish sync
+	msg := &sarama.ProducerMessage{
+		Topic: topic,
+		Value: sarama.StringEncoder(message),
+	}
+	p, o, err := producer.SendMessage(msg)
+	if err != nil {
+		fmt.Println("Error publish: ", err.Error())
+	}
+
+	fmt.Println("Kafka Partition: ", p)
+	fmt.Println("Kafka Offset: ", o)
+}
+
+//startupServer will start the server with all the routes
+func startupServer() {
+	r := mux.NewRouter()
+	staticpath := strings.TrimPrefix(uploadPath, ".")
+	staticpath = staticpath + "/"
+	log.Println(staticpath)
+	r.PathPrefix(staticpath).Handler(http.StripPrefix(staticpath, http.FileServer(http.Dir(uploadPath))))
+	r.HandleFunc("/", helloServer)
+	//CreateAlbum
+	r.HandleFunc("/createAlbum", createAlbum).Methods("POST")
+	//DeleteAlbum
+	r.HandleFunc("/deleteAlbum", deleteAlbum).Methods("DELETE")
+	//CreateImage
+	r.HandleFunc("/createImage", createImage).Methods("POST")
+	//DeleteImage
+	r.HandleFunc("/deleteImage", deleteimage).Methods("DELETE")
+	//GetImage
+	r.HandleFunc("/getImage", getImage).Methods("GET")
+	//	GetAlbumImages
+	r.HandleFunc("/getAlbumImage", getAlbumImage).Methods("GET")
+
+	log.Fatal(http.ListenAndServe("localhost:8000", r))
+
+}
 
 //main is calling startupServer
 func main() {
 
+	//go createKafkaProducer()
 	fmt.Println("The server is up and running")
 	startupServer()
 }
@@ -203,141 +177,6 @@ func helloServer(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// GetImage godoc
-// @Summary Get an image directly as a response
-// @Description Get an image by providing the imageID and the albumID of the image.
-// @Tags images
-// @Accept  json
-// @Produce  image
-// @Success 200 image
-// @Router /getImage [get]
-
-//GetImageStruct used for getting an image
-type GetImageStruct struct {
-	ImageID string `json:"imageid"`
-	AlbumID string `json:"albumid"`
-}
-
-//getImage method is called to get an individual image using image ID
-func getImage(w http.ResponseWriter, r *http.Request) {
-
-	imageid, ok := r.URL.Query()["imageid"]
-	if !ok || len(imageid[0]) < 1 {
-		log.Println("imageid is missing")
-		return
-	}
-	albumid, ok := r.URL.Query()["albumid"]
-	if !ok || len(albumid[0]) < 1 {
-		log.Println("imageid is missing")
-		return
-	}
-
-	log.Println(imageid[0], albumid[0])
-	var getimage GetImageStruct
-	getimage.ImageID = imageid[0]
-	getimage.AlbumID = albumid[0]
-	imagepath, err := gettingImage(getimage)
-	if err != nil {
-		w.WriteHeader(403)
-		WriteJSONResponse(w, 403, "Invalid image or albumid")
-		fmt.Println("Invalid image or albumid")
-		fmt.Println(err)
-		return
-	} else {
-		filebytes, err := ioutil.ReadFile(imagepath)
-		if err != nil {
-			log.Println("Error while reading the file")
-		}
-		_, err = w.Write(filebytes)
-		if err != nil {
-			log.Println("Error while writing the file")
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		return
-	}
-
-}
-
-//getImage is calling this gettingImage internally to handle DB operations
-func gettingImage(getimage GetImageStruct) (string, error) {
-	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
-
-	db, err := sql.Open("postgres", conStr)
-	if err != nil {
-		//log.Println(err)
-		return "", err
-	} else {
-		log.Println("Database connected")
-	}
-	defer db.Close()
-
-	statement := `SELECT imagepath FROM public.image WHERE imageid = $1 AND albumid = $2`
-	imagepath := ""
-	imageintID, err := strconv.Atoi(getimage.ImageID)
-	albumintID, err := strconv.Atoi(getimage.AlbumID)
-	err = db.QueryRow(statement, imageintID, albumintID).Scan(&imagepath)
-	if err != nil {
-		return "", err
-	}
-
-	return imagepath, err
-}
-
-// GetAlbumImage godoc
-// @Summary Get all the images of an album.
-// @Description Get all the images by providing the albumID. Images will be statically served.
-// @Tags images
-// @Accept  json
-// @Produce  image
-// @Param albumid
-// @Success static served images
-// @Router /getAlbumImage [get]
-
-//getAlbumImage is called to get all the images of an album, this method is only redirecting the request
-//to correct file location where the files are being served.
-func getAlbumImage(w http.ResponseWriter, r *http.Request) {
-
-	albumid, ok := r.URL.Query()["albumid"]
-	if !ok || len(albumid[0]) < 1 {
-		log.Println("Album is missing")
-		return
-	}
-	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
-
-	db, err := sql.Open("postgres", conStr)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println("Database connected")
-	}
-	defer db.Close()
-
-	albumidInt, err := strconv.Atoi(albumid[0])
-	statement := `SELECT albumid FROM public.album WHERE albumid = $1`
-	var id int
-	err = db.QueryRow(statement, albumidInt).Scan(&id)
-	if err != nil {
-		log.Println(err)
-		w.Write([]byte("Album does not exist"))
-		WriteJSONResponse(w, 403, http.StatusForbidden)
-		return
-	} else {
-		url := uploadPath + "/" + albumid[0] + "/"
-		log.Println(url)
-		http.Redirect(w, r, url, http.StatusSeeOther)
-	}
-	return
-}
-
-// CreateAlbum godoc
-// @Summary Create a new album
-// @Description Create a new album with the album id and album name
-// @Tags Album
-// @Accept  json
-// @Produce  json
-// @Success 200
-// @Router /createAlbum [post]
 //createAlbum is called when album creation request is made.
 func createAlbum(w http.ResponseWriter, r *http.Request) {
 
@@ -404,91 +243,6 @@ func creatingAlbum(newAlbum CreateAlbum) (Album, error) {
 	return album, nil
 }
 
-// DeleteAlbum godoc
-// @Summary Delete an existing album
-// @Description Delete an existing album by the album id
-// @Tags Album
-// @Accept  json
-// @Produce  json
-// @Param albumID albumName
-// @Success 200 {object} Order
-// @Router /deleteAlbum [post]
-
-type deleteAlbumStruct struct {
-	AlbumID string `json:"albumid"`
-}
-
-//deleteAlbum is called to delete an album by providing the albumid.
-func deleteAlbum(w http.ResponseWriter, r *http.Request) {
-
-	var DelAlbum deleteAlbumStruct
-	err := json.NewDecoder(r.Body).Decode(&DelAlbum)
-	if err != nil {
-		w.WriteHeader(http.StatusForbidden)
-		log.Println(err)
-	}
-
-	log.Println("Album ID needs to be deleted : ", DelAlbum)
-
-	delalbum, err := deletingAlbum(DelAlbum)
-	if err != nil {
-		log.Println(err)
-		w.Header().Set("Content-Type", "application/json")
-		WriteJSONResponse(w, 403, "No Album Found with the given id")
-		return
-	} else {
-		err = os.RemoveAll(uploadPath + "/" + delalbum.ID)
-		if err != nil {
-			log.Println(err)
-		}
-		log.Printf("Album %s Deleted", delalbum.Name)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("Album " + delalbum.Name + " is deleted"))
-		WriteJSONResponse(w, 200, "Album deletion Successfull")
-		return
-	}
-
-}
-
-//deletingAlbum is being called from deleteAlbum to handle DB operation
-func deletingAlbum(DelAlbum deleteAlbumStruct) (Album, error) {
-
-	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
-	var delalbum Album
-	db, err := sql.Open("postgres", conStr)
-	if err != nil {
-		//log.Println(err)
-		return delalbum, err
-	} else {
-		log.Println("Database connected")
-	}
-
-	defer db.Close()
-
-	statement := `Delete FROM public.album WHERE albumid = $1 RETURNING albumname, albumid`
-	name := ""
-	var id int
-	albumIDInt, err := strconv.Atoi(DelAlbum.AlbumID)
-	err = db.QueryRow(statement, albumIDInt).Scan(&name, &id)
-	if err != nil {
-		log.Println(err)
-		return delalbum, err
-	}
-	log.Println("Deleted Album is : ", name)
-	delalbum.ID = strconv.Itoa(id)
-	delalbum.Name = name
-	return delalbum, nil
-
-}
-
-// CreateImage godoc
-// @Summary Create/upload a new image
-// @Description Create a new image with the data(imageID, imageName, albumid) imagepath(file) in payload.
-// @Tags Album
-// @Accept  json
-// @Produce  json
-// @Success 200
-// @Router /createImage [post]
 //createImage is called when a new image is uploaded on a specific albumid
 func createImage(w http.ResponseWriter, r *http.Request) {
 
@@ -599,6 +353,7 @@ func createImage(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("ImageID " + imageidreturn + "uploaded"))
 		WriteJSONResponse(w, 200, "Successfully Uploaded File")
+		createKafkaProducer("imageID " + imageidreturn + " uploaded")
 	}
 
 	// Create a temporary file within our temp-images directory that follows
@@ -659,19 +414,67 @@ func creatingImage(pushImageDB PushImageDB) (string, error) {
 
 }
 
-// DeleteImage godoc
-// @Summary Delete an existing image
-// @Description Delete an existing image by imageID, imageName, albumid) in payload.
-// @Tags Album
-// @Accept  json
-// @Produce  json
-// @Param data(imageID, imageName, albumid)
-// @Success 200
-// @Router /deleteImage [post]
+//deleteAlbum is called to delete an album by providing the albumid.
+func deleteAlbum(w http.ResponseWriter, r *http.Request) {
 
-type DelImageStruct struct {
-	ImageID string `json:"imageid"`
-	AlbumID string `json:"albumid"`
+	var DelAlbum deleteAlbumStruct
+	err := json.NewDecoder(r.Body).Decode(&DelAlbum)
+	if err != nil {
+		w.WriteHeader(http.StatusForbidden)
+		log.Println(err)
+	}
+
+	log.Println("Album ID needs to be deleted : ", DelAlbum)
+
+	delalbum, err := deletingAlbum(DelAlbum)
+	if err != nil {
+		log.Println(err)
+		w.Header().Set("Content-Type", "application/json")
+		WriteJSONResponse(w, 403, "No Album Found with the given id")
+		return
+	} else {
+		err = os.RemoveAll(uploadPath + "/" + delalbum.ID)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Printf("Album %s Deleted", delalbum.Name)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("Album " + delalbum.Name + " is deleted"))
+		WriteJSONResponse(w, 200, "Album deletion Successfull")
+		return
+	}
+
+}
+
+//deletingAlbum is being called from deleteAlbum to handle DB operation
+func deletingAlbum(DelAlbum deleteAlbumStruct) (Album, error) {
+
+	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
+	var delalbum Album
+	db, err := sql.Open("postgres", conStr)
+	if err != nil {
+		//log.Println(err)
+		return delalbum, err
+	} else {
+		log.Println("Database connected")
+	}
+
+	defer db.Close()
+
+	statement := `Delete FROM public.album WHERE albumid = $1 RETURNING albumname, albumid`
+	name := ""
+	var id int
+	albumIDInt, err := strconv.Atoi(DelAlbum.AlbumID)
+	err = db.QueryRow(statement, albumIDInt).Scan(&name, &id)
+	if err != nil {
+		log.Println(err)
+		return delalbum, err
+	}
+	log.Println("Deleted Album is : ", name)
+	delalbum.ID = strconv.Itoa(id)
+	delalbum.Name = name
+	return delalbum, nil
+
 }
 
 //deleteimage is called to delete a specific image, by given imageid
@@ -701,6 +504,7 @@ func deleteimage(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Image %s Deleted", imageName)
 		w.Header().Set("Content-Type", "application/json")
 		WriteJSONResponse(w, 200, "Successfully deleted the image")
+		createKafkaProducer(imageName + " deleted")
 		return
 	}
 
@@ -732,4 +536,106 @@ func deletingImage(DelImage DelImageStruct) (string, error) {
 	}
 	log.Println("Deleted Image is : ", name)
 	return name, nil
+}
+
+//getAlbumImage is called to get all the images of an album, this method is only redirecting the request
+//to correct file location where the files are being served.
+func getAlbumImage(w http.ResponseWriter, r *http.Request) {
+
+	albumid, ok := r.URL.Query()["albumid"]
+	if !ok || len(albumid[0]) < 1 {
+		log.Println("Album is missing")
+		return
+	}
+	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
+
+	db, err := sql.Open("postgres", conStr)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println("Database connected")
+	}
+	defer db.Close()
+
+	albumidInt, err := strconv.Atoi(albumid[0])
+	statement := `SELECT albumid FROM public.album WHERE albumid = $1`
+	var id int
+	err = db.QueryRow(statement, albumidInt).Scan(&id)
+	if err != nil {
+		log.Println(err)
+		w.Write([]byte("Album does not exist"))
+		WriteJSONResponse(w, 403, http.StatusForbidden)
+		return
+	} else {
+		url := uploadPath + "/" + albumid[0] + "/"
+		log.Println(url)
+		http.Redirect(w, r, url, http.StatusSeeOther)
+	}
+	return
+}
+
+//getImage method is called to get an individual image using image ID
+func getImage(w http.ResponseWriter, r *http.Request) {
+
+	imageid, ok := r.URL.Query()["imageid"]
+	if !ok || len(imageid[0]) < 1 {
+		log.Println("imageid is missing")
+		return
+	}
+	albumid, ok := r.URL.Query()["albumid"]
+	if !ok || len(albumid[0]) < 1 {
+		log.Println("imageid is missing")
+		return
+	}
+
+	log.Println(imageid[0], albumid[0])
+	var getimage GetImageStruct
+	getimage.ImageID = imageid[0]
+	getimage.AlbumID = albumid[0]
+	imagepath, err := gettingImage(getimage)
+	if err != nil {
+		w.WriteHeader(403)
+		WriteJSONResponse(w, 403, "Invalid image or albumid")
+		fmt.Println("Invalid image or albumid")
+		fmt.Println(err)
+		return
+	} else {
+		filebytes, err := ioutil.ReadFile(imagepath)
+		if err != nil {
+			log.Println("Error while reading the file")
+		}
+		_, err = w.Write(filebytes)
+		if err != nil {
+			log.Println("Error while writing the file")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		return
+	}
+
+}
+
+//getImage is calling this gettingImage internally to handle DB operations
+func gettingImage(getimage GetImageStruct) (string, error) {
+	conStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", hostname, hostport, username, password, databasename)
+
+	db, err := sql.Open("postgres", conStr)
+	if err != nil {
+		//log.Println(err)
+		return "", err
+	} else {
+		log.Println("Database connected")
+	}
+	defer db.Close()
+
+	statement := `SELECT imagepath FROM public.image WHERE imageid = $1 AND albumid = $2`
+	imagepath := ""
+	imageintID, err := strconv.Atoi(getimage.ImageID)
+	albumintID, err := strconv.Atoi(getimage.AlbumID)
+	err = db.QueryRow(statement, imageintID, albumintID).Scan(&imagepath)
+	if err != nil {
+		return "", err
+	}
+
+	return imagepath, err
 }
