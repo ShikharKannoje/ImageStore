@@ -26,11 +26,8 @@ Key elements of the service
 8. If the whole album needs to be fetched then I have served them statically, every image will be served on that location.
 
 
-## Development
-
-To make changes to the cc-iot-user-management-service, clone the source code and
-download all the required development dependencies:
-
+### Generate a spec from source
+swagger generate spec -o ./swagger.json
 
 
 These are the environement variables, kindly set the environment variable first to run the serices
