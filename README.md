@@ -3,6 +3,7 @@
 
 ImageStore service is based on Golang and PostgreSQL. I have used kafka for producing notification on a topic
 everytime when a image or album is created to deleted. 
+postgresDB can be downloaded from https://github.com/ShikharKannoje/imageStoreDB
 
 To setup the application, follow the below procedures
 
